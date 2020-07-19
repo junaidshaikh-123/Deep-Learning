@@ -1,0 +1,155 @@
+In [0]:
+from numpy import array
+import pandas as pd
+
+from numpy import zeros
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import Flatten
+from keras.layers import Embedding
+from keras_preprocessing.text import one_hot
+from numpy import asarray
+In [7]:
+df = pd.read_csv('/content/drive/My Drive/edvancer dl proj3quora train.csv')
+df.head()
+Out[7]:
+qid	question_text	target
+0	00002165364db923c7e6	How did Quebec nationalists see their province...	0
+1	000032939017120e6e44	Do you have an adopted dog, how would you enco...	0
+2	0000412ca6e4628ce2cf	Why does velocity affect time? Does velocity a...	0
+3	000042bf85aa498cd78e	How did Otto von Guericke used the Magdeburg h...	0
+4	0000455dfa3e01eae3af	Can I convert montra helicon D to a mountain b...	0
+In [0]:
+x = df['question_text']
+y = df['target']
+In [0]:
+token = Tokenizer()
+token.fit_on_texts(x)
+seq = token.texts_to_sequences(x)
+In [0]:
+pad_seq = pad_sequences(seq,maxlen=300)
+In [0]:
+vocab_size = len(token.word_index)+1
+In [19]:
+!wget http://nlp.stanford.edu/data/glove.6B.zip
+--2020-06-13 14:43:37--  http://nlp.stanford.edu/data/glove.6B.zip
+Resolving nlp.stanford.edu (nlp.stanford.edu)... 171.64.67.140
+Connecting to nlp.stanford.edu (nlp.stanford.edu)|171.64.67.140|:80... connected.
+HTTP request sent, awaiting response... 302 Found
+Location: https://nlp.stanford.edu/data/glove.6B.zip [following]
+--2020-06-13 14:43:37--  https://nlp.stanford.edu/data/glove.6B.zip
+Connecting to nlp.stanford.edu (nlp.stanford.edu)|171.64.67.140|:443... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: http://downloads.cs.stanford.edu/nlp/data/glove.6B.zip [following]
+--2020-06-13 14:43:37--  http://downloads.cs.stanford.edu/nlp/data/glove.6B.zip
+Resolving downloads.cs.stanford.edu (downloads.cs.stanford.edu)... 171.64.64.22
+Connecting to downloads.cs.stanford.edu (downloads.cs.stanford.edu)|171.64.64.22|:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 862182613 (822M) [application/zip]
+Saving to: ‘glove.6B.zip.2’
+
+glove.6B.zip.2      100%[===================>] 822.24M  1.92MB/s    in 6m 28s  
+
+2020-06-13 14:50:05 (2.12 MB/s) - ‘glove.6B.zip.2’ saved [862182613/862182613]
+
+In [20]:
+!unzip /content/glove.6B.zip.2
+Archive:  /content/glove.6B.zip.2
+  inflating: glove.6B.50d.txt        
+  inflating: glove.6B.100d.txt       
+  inflating: glove.6B.200d.txt       
+  inflating: glove.6B.300d.txt       
+In [22]:
+embeddings_index = dict()
+f = open('/content/glove.6B.100d.txt',mode='rt',encoding='utf-8')
+for line in f:
+	values = line.split()
+	word = values[0]
+	coefs = asarray(values[1:], dtype='float32')
+	embeddings_index[word] = coefs
+f.close()
+print('Loaded %s word vectors.' % len(embeddings_index))
+Loaded 400000 word vectors.
+In [0]:
+from tqdm import tqdm
+In [27]:
+import numpy as np
+embedding_matrix = np.zeros((vocab_size,300))
+for word,i in tqdm(token.word_index.items()):
+    embedding_value = embedding_vector.get(word)
+    if embedding_value is not None:
+        embedding_matrix[i] = embedding_value
+100%|██████████| 222161/222161 [00:00<00:00, 1074365.05it/s]
+In [0]:
+# define model
+model = Sequential()
+model.add(Embedding(vocab_size,300,weights = [embedding_matrix],input_length=300,trainable = False))
+model.add(Flatten())
+model.add(Dense(1, activation='sigmoid'))
+In [0]:
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+In [38]:
+print(model.summary())
+Model: "sequential_6"
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+embedding_5 (Embedding)      (None, 300, 300)          66648600  
+_________________________________________________________________
+flatten_1 (Flatten)          (None, 90000)             0         
+_________________________________________________________________
+dense_1 (Dense)              (None, 1)                 90001     
+=================================================================
+Total params: 66,738,601
+Trainable params: 90,001
+Non-trainable params: 66,648,600
+_________________________________________________________________
+None
+In [39]:
+model.fit(pad_seq,y,epochs = 5,batch_size=256,validation_split=0.2)
+Train on 1044897 samples, validate on 261225 samples
+Epoch 1/5
+1044897/1044897 [==============================] - 224s 215us/step - loss: 0.3417 - accuracy: 0.9382 - val_loss: 0.2370 - val_accuracy: 0.9377
+Epoch 2/5
+1044897/1044897 [==============================] - 222s 212us/step - loss: 0.2323 - accuracy: 0.9382 - val_loss: 0.2332 - val_accuracy: 0.9377
+Epoch 3/5
+1044897/1044897 [==============================] - 222s 213us/step - loss: 0.2318 - accuracy: 0.9382 - val_loss: 0.2332 - val_accuracy: 0.9377
+Epoch 4/5
+1044897/1044897 [==============================] - 216s 206us/step - loss: 0.2318 - accuracy: 0.9382 - val_loss: 0.2332 - val_accuracy: 0.9377
+Epoch 5/5
+1044897/1044897 [==============================] - 215s 206us/step - loss: 0.2318 - accuracy: 0.9382 - val_loss: 0.2332 - val_accuracy: 0.9377
+Out[39]:
+<keras.callbacks.callbacks.History at 0x7fb0ffe20f98>
+In [42]:
+loss, accuracy = model.evaluate(pad_seq,y, verbose=0)
+print('Accuracy: %f' % (accuracy*100))
+Accuracy: 93.812984
+In [0]:
+model.save('/content/drive/My Drive/Colab Notebooks/quoraspamfilter.h5')
+In [44]:
+testing = pd.read_csv('/content/drive/My Drive/edvancer dl proj3quora train.csv')
+testing.head()
+Out[44]:
+qid	question_text	target
+0	00002165364db923c7e6	How did Quebec nationalists see their province...	0
+1	000032939017120e6e44	Do you have an adopted dog, how would you enco...	0
+2	0000412ca6e4628ce2cf	Why does velocity affect time? Does velocity a...	0
+3	000042bf85aa498cd78e	How did Otto von Guericke used the Magdeburg h...	0
+4	0000455dfa3e01eae3af	Can I convert montra helicon D to a mountain b...	0
+In [0]:
+x_test = testing['question_text']
+x_test = token.texts_to_sequences(x_test)
+testing_seq = pad_sequences(x_test,maxlen=300)
+In [46]:
+predict = model.predict_classes(testing_seq)
+testing['label'] = predict
+testing.head()
+Out[46]:
+qid	question_text	target	label
+0	00002165364db923c7e6	How did Quebec nationalists see their province...	0	0
+1	000032939017120e6e44	Do you have an adopted dog, how would you enco...	0	0
+2	0000412ca6e4628ce2cf	Why does velocity affect time? Does velocity a...	0	0
+3	000042bf85aa498cd78e	How did Otto von Guericke used the Magdeburg h...	0	0
+4	0000455dfa3e01eae3af	Can I convert montra helicon D to a mountain b...	0	0
